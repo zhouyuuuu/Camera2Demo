@@ -7,45 +7,61 @@
 
     <TextureView
         android:id="@+id/textureview_camera"
-        android:layout_width="match_parent"
-        android:layout_height="match_parent" />
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_centerVertical="true" />
 
     <LinearLayout
-        android:orientation="horizontal"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content">
+        android:layout_height="wrap_content"
+        android:layout_marginTop="10dp"
+        android:orientation="horizontal">
 
         <ImageView
             android:id="@+id/iv_change_flash_mode"
-            android:src="@mipmap/ic_flash_off"
-            android:layout_weight="1"
             android:layout_width="0dp"
-            android:layout_height="wrap_content" />
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:contentDescription="@string/todo"
+            android:src="@mipmap/ic_flash_off" />
 
         <ImageView
             android:id="@+id/iv_change_camera"
-            android:src="@mipmap/ic_switch_camera_enabled"
-            android:layout_weight="1"
             android:layout_width="0dp"
-            android:layout_height="wrap_content" />
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:contentDescription="@string/todo"
+            android:src="@mipmap/ic_switch_camera_enabled" />
 
         <ImageView
             android:id="@+id/iv_change_scale"
-            android:src="@mipmap/ic_switch_aspect_ratio"
-            android:layout_weight="1"
             android:layout_width="0dp"
-            android:layout_height="wrap_content" />
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:contentDescription="@string/todo"
+            android:src="@mipmap/ic_switch_aspect_ratio" />
     </LinearLayout>
 
     <ImageView
         android:id="@+id/iv_take_picture"
-        android:background="@drawable/ic_forerunner_camera_bg"
-        android:layout_margin="17dp"
-        android:padding="17dp"
-        android:src="@mipmap/ic_forerunner_camera"
+        android:layout_width="80dp"
+        android:layout_height="80dp"
         android:layout_alignParentBottom="true"
         android:layout_centerHorizontal="true"
+        android:layout_margin="17dp"
+        android:background="@drawable/ic_forerunner_camera_bg"
+        android:contentDescription="@string/todo"
+        android:padding="17dp"
+        android:src="@mipmap/ic_forerunner_camera" />
+
+    <ImageView
+        android:id="@+id/iv_show"
         android:layout_width="80dp"
-        android:layout_height="80dp" />
+        android:layout_height="80dp"
+        android:layout_centerInParent="true"
+        android:layout_margin="17dp"
+        android:background="#99999999"
+        android:contentDescription="@string/todo"
+        android:visibility="visible" />
 
 </RelativeLayout>
