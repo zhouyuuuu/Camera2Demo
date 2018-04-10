@@ -3,7 +3,7 @@
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    tools:context="com.example.administrator.cameraproject.CameraActivity">
+    tools:context="com.example.administrator.cameraproject.module.camera.activity.CameraActivity">
 
     <TextureView
         android:id="@+id/textureview_camera"
@@ -14,7 +14,7 @@
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="10dp"
+        android:layout_marginTop="@dimen/camera_top_button_margin_top"
         android:orientation="horizontal">
 
         <ImageView
@@ -44,24 +44,14 @@
 
     <ImageView
         android:id="@+id/iv_take_picture"
-        android:layout_width="80dp"
-        android:layout_height="80dp"
+        android:layout_width="@dimen/camera_take_picture_iv_width"
+        android:layout_height="@dimen/camera_take_picture_iv_height"
         android:layout_alignParentBottom="true"
         android:layout_centerHorizontal="true"
-        android:layout_margin="17dp"
+        android:layout_margin="@dimen/camera_take_picture_iv_margin"
         android:background="@drawable/ic_forerunner_camera_bg"
         android:contentDescription="@string/todo"
-        android:padding="17dp"
+        android:padding="@dimen/camera_take_picture_iv_padding"
         android:src="@mipmap/ic_forerunner_camera" />
-
-    <ImageView
-        android:id="@+id/iv_show"
-        android:layout_width="80dp"
-        android:layout_height="80dp"
-        android:layout_centerInParent="true"
-        android:layout_margin="17dp"
-        android:background="#99999999"
-        android:contentDescription="@string/todo"
-        android:visibility="visible" />
 
 </RelativeLayout>
