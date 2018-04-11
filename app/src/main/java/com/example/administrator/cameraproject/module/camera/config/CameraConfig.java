@@ -6,6 +6,7 @@ import android.os.Environment;
 import android.support.annotation.RequiresApi;
 
 /**
+ * 常量类
  * Edited by Administrator on 2018/4/10.
  */
 
@@ -21,4 +22,12 @@ public class CameraConfig {
     public static final String CAMERA_REAR_ID = "" + CameraCharacteristics.LENS_FACING_FRONT;
     // 前置摄像头ID
     public static final String CAMERA_FRONT_ID = "" + CameraCharacteristics.LENS_FACING_BACK;
+    // 闪光灯关闭
+    public static final int FLASH_OFF = 0;
+    // 闪光灯自动
+    public static final int FLASH_AUTO = 1;
+    // 闪光灯常亮
+    public static final int FLASH_ALWAYS = 2;
+    // 闪光灯打开
+    public static final int FLASH_ON = 3;
 }

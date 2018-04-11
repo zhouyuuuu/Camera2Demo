@@ -15,6 +15,7 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 
 /**
+ * 存储工具类，存图片和读取缩略图
  * Edited by Administrator on 2018/4/10.
  */
 
@@ -23,7 +24,8 @@ public class StoreUtil {
 
     /**
      * 载入适合ImageView尺寸的本地图片
-     * @param fileName 文件名
+     *
+     * @param fileName  文件名
      * @param imageView ImageView
      * @return Bitmap
      */
@@ -35,18 +37,19 @@ public class StoreUtil {
         int width = options.outWidth;
         options.inSampleSize = width / imageView.getWidth();
         options.inJustDecodeBounds = false;
-        return BitmapFactory.decodeFile(path,options);
+        return BitmapFactory.decodeFile(path, options);
     }
 
     /**
      * 保存图片
-     * @param bitmap 图片
+     *
+     * @param bitmap   图片
      * @param fileName 文件名
      */
     public static void saveBitmap(@NonNull Bitmap bitmap, String fileName) {
         // 如果不存在该文件夹则创建
         File folder = new File(CameraConfig.PHOTO_PATH);
-        if (!folder.exists()||!folder.isDirectory()){
+        if (!folder.exists() || !folder.isDirectory()) {
             if (!folder.mkdir()) {
                 return;
             }

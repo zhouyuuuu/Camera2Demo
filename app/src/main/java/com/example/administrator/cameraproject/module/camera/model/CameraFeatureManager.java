@@ -8,7 +8,6 @@ import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.ImageFormat;
 import android.graphics.Matrix;
-import android.graphics.RectF;
 import android.graphics.SurfaceTexture;
 import android.hardware.camera2.CameraAccessException;
 import android.hardware.camera2.CameraCaptureSession;
@@ -16,6 +15,7 @@ import android.hardware.camera2.CameraCharacteristics;
 import android.hardware.camera2.CameraDevice;
 import android.hardware.camera2.CameraManager;
 import android.hardware.camera2.CaptureRequest;
+import android.hardware.camera2.TotalCaptureResult;
 import android.hardware.camera2.params.StreamConfigurationMap;
 import android.media.Image;
 import android.media.ImageReader;
@@ -29,6 +29,7 @@ import android.support.v4.app.ActivityCompat;
 import android.util.Size;
 import android.view.Surface;
 import android.view.TextureView;
+import android.widget.RelativeLayout;
 
 import com.example.administrator.cameraproject.module.camera.application.CameraApplication;
 import com.example.administrator.cameraproject.module.camera.config.CameraConfig;
@@ -40,16 +41,23 @@ import java.nio.ByteBuffer;
 import java.util.Arrays;
 
 /**
+ * 相机功能管理者，Model，管理闪光灯、比例、镜头、预览、拍照
  * Edited by Administrator on 2018/4/10.
  */
 
 @RequiresApi(api = Build.VERSION_CODES.LOLLIPOP)
 public class CameraFeatureManager implements ImageReader.OnImageAvailableListener, ICameraFeatureManager {
 
+    // 后置模式
+    private static final int CAMERA_REAR_MODE = 101;
+    // 前置模式
+    private static final int CAMERA_FRONT_MODE = 102;
     // 子线程名
     private static final String THREAD_NAME = "cameraThread";
+    // 默认后置摄像头
+    private int mCameraMode = CAMERA_REAR_MODE;
     // 默认是后置摄像头
-    private static String mCameraID = CameraConfig.CAMERA_REAR_ID;
+    private String mCameraID = CameraConfig.CAMERA_REAR_ID;
     // 主线程handler
     private Handler mMainHandler;
     // 子线程handler
@@ -68,6 +76,18 @@ public class CameraFeatureManager implements ImageReader.OnImageAvailableListene
     private WeakReference<TextureView> mTextureViewWeakReference;
     // activity弱引用
     private WeakReference<Activity> mActivityWeakReference;
+    // session
+    private CameraCaptureSession mCameraCaptureSession;
+    // 预览请求
+    private CaptureRequest mPreviewRequest;
+    // 相机状态回调
+    private CameraStateCallback mCameraStateCallback;
+    // 目标尺寸
+    private Size mTargetSize;
+    // 默认闪光模式为关闭
+    private int mFlashMode = CameraConfig.FLASH_OFF;
+    // 默认照片比例为16比9
+    private float mCameraRatio = 16f / 9;
 
     public CameraFeatureManager(ICameraFeaturePresenter iCameraFeaturePresenter) {
         this.mMainHandler = new Handler(Looper.getMainLooper());
@@ -79,35 +99,153 @@ public class CameraFeatureManager implements ImageReader.OnImageAvailableListene
     }
 
     /**
-     * 通过对比得到与宽高比最接近的尺寸（如果有相同尺寸，优先选择）
+     * 通过对比得到与宽高比最接近的尺寸
+     * 这边思路是找到比例最接近的相机支持的比例，如果有比例相同的，则比较与textureView的宽之差，相差最小的为最合适的
      *
-     * @param textureViewWidth  需要被进行对比的原宽
-     * @param textureViewHeight 需要被进行对比的原高
-     * @param preSizeList       需要对比的预览尺寸列表
+     * @param cameraRatio 相机宽高比
+     * @param preSizeList 需要对比的预览尺寸列表
      * @return 得到与原宽高比例最接近的尺寸
      */
-    private static Size getCloselyPreSize(int textureViewWidth, int textureViewHeight,
-                                          Size[] preSizeList) {
-        for (Size size : preSizeList) {
-            // 由于是竖屏，宽和高是反过来的
-            if ((size.getWidth() == textureViewHeight) && (size.getHeight() == textureViewWidth)) {
-                return size;
-            }
-        }
-        // 得到与传入的宽高比最接近的size
-        float reqRatio = ((float) textureViewHeight) / textureViewWidth;
+    private static Size getCloselyPreSize(float cameraRatio, int textureViewWidth, Size[] preSizeList) {
         float curRatio, deltaRatio;
+        int curWidth, deltaWidth;
         float deltaRatioMin = Float.MAX_VALUE;
+        int deltaWidthMin = Integer.MAX_VALUE;
         Size retSize = null;
         for (Size size : preSizeList) {
             curRatio = ((float) size.getWidth()) / size.getHeight();
-            deltaRatio = Math.abs(reqRatio - curRatio);
-            if (deltaRatio < deltaRatioMin) {
+            curWidth = size.getHeight();
+            deltaRatio = Math.abs(cameraRatio - curRatio);
+            deltaWidth = Math.abs(textureViewWidth - curWidth);
+            if (deltaRatio < deltaRatioMin || (deltaRatio == deltaRatioMin && deltaWidth < deltaWidthMin)) {
                 deltaRatioMin = deltaRatio;
+                deltaWidthMin = deltaWidth;
                 retSize = size;
             }
         }
         return retSize;
+    }
+
+    /**
+     * 改变闪关灯模式，session要重新关掉预览并重启
+     *
+     * @param flashMode 模式
+     */
+    @Override
+    public void setFlashMode(int flashMode) {
+        if (flashMode == CameraConfig.FLASH_ALWAYS || mFlashMode == CameraConfig.FLASH_ALWAYS) {
+            mFlashMode = flashMode;
+            sessionStopPreview();
+            sessionPreview();
+        } else {
+            mFlashMode = flashMode;
+        }
+    }
+
+    /**
+     * session停止预览
+     */
+    private void sessionStopPreview() {
+        if (mCameraCaptureSession != null) {
+            try {
+                mCameraCaptureSession.stopRepeating();
+            } catch (CameraAccessException e) {
+                e.printStackTrace();
+            }
+        }
+    }
+
+    /**
+     * session开启预览
+     */
+    private void sessionPreview() {
+        if (mCameraCaptureSession == null) return;
+        if (mCameraDevice == null) return;
+        if (mSurface == null) return;
+        try {
+            // 预览请求Builder
+            CaptureRequest.Builder requestBuilder = mCameraDevice.createCaptureRequest(CameraDevice.TEMPLATE_PREVIEW);
+            // 设置图片输出目标
+            requestBuilder.addTarget(mSurface);
+            // 设置自动对焦模式
+            requestBuilder.set(CaptureRequest.CONTROL_AF_MODE, CaptureRequest.CONTROL_AF_MODE_CONTINUOUS_PICTURE);
+            if (mFlashMode == CameraConfig.FLASH_ALWAYS) {
+                requestBuilder.set(CaptureRequest.CONTROL_AE_MODE, CaptureRequest.CONTROL_AE_MODE_ON);
+                requestBuilder.set(CaptureRequest.FLASH_MODE, CaptureRequest.FLASH_MODE_TORCH);
+            }
+            // 建立请求
+            mPreviewRequest = requestBuilder.build();
+            // 开始显示相机预览
+            mCameraCaptureSession.setRepeatingRequest(mPreviewRequest, null, null);
+        } catch (CameraAccessException e) {
+            e.printStackTrace();
+        }
+    }
+
+    /**
+     * 设置照片比例，设置完了要关闭预览再重启
+     *
+     * @param cameraRatio 比例
+     */
+    @Override
+    public void setCameraRatio(float cameraRatio) {
+        this.mCameraRatio = cameraRatio;
+        stopCameraAndPreview();
+        openCameraAndStartPreview();
+    }
+
+    /**
+     * 改变相机模式（前后置）
+     */
+    @Override
+    public void changeCameraMode() {
+        // 前后置转换
+        switch (mCameraMode) {
+            case CAMERA_FRONT_MODE:
+                mCameraID = CameraConfig.CAMERA_REAR_ID;
+                mCameraMode = CAMERA_REAR_MODE;
+                break;
+            case CAMERA_REAR_MODE:
+                mCameraID = CameraConfig.CAMERA_FRONT_ID;
+                mCameraMode = CAMERA_FRONT_MODE;
+                break;
+        }
+        // 重新打开相机预览
+        stopCameraAndPreview();
+        openCameraAndStartPreview();
+    }
+
+    /**
+     * 停止相机和预览
+     */
+    @Override
+    public void stopCameraAndPreview() {
+        // 关掉相机设备
+        if (mCameraDevice != null) {
+            mCameraDevice.close();
+        }
+        // 关掉Reader
+        if (mImageReader != null) {
+            mImageReader.close();
+        }
+        // 关掉session
+        if (mCameraCaptureSession != null) {
+            mCameraCaptureSession.close();
+        }
+        // 释放surface
+        if (mSurface != null) {
+            mSurface.release();
+        }
+    }
+
+    /**
+     * 重启相机并预览
+     */
+    @Override
+    public void openCameraAndStartPreview() {
+        if (mTextureViewWeakReference == null || mTextureViewWeakReference.get() == null) return;
+        if (mActivityWeakReference == null || mActivityWeakReference.get() == null) return;
+        openCameraAndStartPreview(mTextureViewWeakReference.get(), mActivityWeakReference.get());
     }
 
     /**
@@ -117,20 +255,25 @@ public class CameraFeatureManager implements ImageReader.OnImageAvailableListene
      * @param activity    activity
      */
     @Override
-    public void startPreview(TextureView textureView, Activity activity) {
+    public void openCameraAndStartPreview(TextureView textureView, Activity activity) {
+        if (textureView == null) return;
+        if (activity == null) return;
         mTextureViewWeakReference = new WeakReference<>(textureView);
         mActivityWeakReference = new WeakReference<>(activity);
         // 获取摄像头管理
         mCameraManager = (CameraManager) CameraApplication.getApplication().getSystemService(Context.CAMERA_SERVICE);
         try {
-            if (ActivityCompat.checkSelfPermission(CameraApplication.getApplication(), Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED && ActivityCompat.checkSelfPermission(CameraApplication.getApplication(), Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
+            if (ActivityCompat.checkSelfPermission(CameraApplication.getApplication(), Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED
+                    && ActivityCompat.checkSelfPermission(CameraApplication.getApplication(), Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
                 ActivityCompat.requestPermissions(activity, new String[]{Manifest.permission.CAMERA, Manifest.permission.WRITE_EXTERNAL_STORAGE}, 1);
                 return;
             }
-            // 打开摄像头
-            if (mCameraManager != null) {
-                mCameraManager.openCamera(mCameraID, new CameraStateCallback(), mMainHandler);
+            if (mCameraManager == null) return;
+            if (mCameraStateCallback == null) {
+                mCameraStateCallback = new CameraStateCallback();
             }
+            // 打开摄像头
+            mCameraManager.openCamera(mCameraID, mCameraStateCallback, mMainHandler);
         } catch (CameraAccessException e) {
             e.printStackTrace();
         }
@@ -141,57 +284,51 @@ public class CameraFeatureManager implements ImageReader.OnImageAvailableListene
      */
     @Override
     public void takePhoto() {
+        if (mCameraDevice == null) return;
+        if (mImageReader == null) return;
+        if (mCameraCaptureSession == null) return;
+        if (mPreviewRequest == null) return;
         try {
-            // 关闭之前使用过的reader
-            if (mImageReader != null) {
-                mImageReader.close();
+            // 创建拍照需要的CaptureRequest.Builder
+            final CaptureRequest.Builder captureRequestBuilder = mCameraDevice.createCaptureRequest(CameraDevice.TEMPLATE_STILL_CAPTURE);
+            // 将mImageReader的surface作为CaptureRequest.Builder的目标
+            captureRequestBuilder.addTarget(mImageReader.getSurface());
+            // 自动对焦
+            captureRequestBuilder.set(CaptureRequest.CONTROL_AF_MODE, CaptureRequest.CONTROL_AF_MODE_CONTINUOUS_PICTURE);
+            // 根据mFlashMode决定开不开闪光灯
+            switch (mFlashMode) {
+                case CameraConfig.FLASH_ALWAYS:
+                    captureRequestBuilder.set(CaptureRequest.CONTROL_AE_MODE, CaptureRequest.CONTROL_AE_MODE_ON_ALWAYS_FLASH);
+                    break;
+                case CameraConfig.FLASH_OFF:
+                    captureRequestBuilder.set(CaptureRequest.CONTROL_AE_MODE, CaptureRequest.CONTROL_AE_MODE_ON);
+                    captureRequestBuilder.set(CaptureRequest.FLASH_MODE, CaptureRequest.FLASH_MODE_OFF);
+                    break;
+                case CameraConfig.FLASH_ON:
+                    captureRequestBuilder.set(CaptureRequest.CONTROL_AE_MODE, CaptureRequest.CONTROL_AE_MODE_ON);
+                    captureRequestBuilder.set(CaptureRequest.FLASH_MODE, CaptureRequest.FLASH_MODE_TORCH);
+                    break;
             }
-            // 得到新的reader，一个reader只可以用一次
-            mImageReader = newReader();
-            if (mImageReader == null) return;
-            // 拍照请求，异步回调
-            mCameraDevice.createCaptureSession(Arrays.asList(mSurface, mImageReader.getSurface()), new CaptureSessionStateCallback(), mChildHandler);
+            // 拍照请求
+            CaptureRequest captureRequest = captureRequestBuilder.build();
+            // 停止预览
+            mCameraCaptureSession.stopRepeating();
+            // 开始拍照
+            mCameraCaptureSession.capture(captureRequest, new CameraCaptureSession.CaptureCallback() {
+                @Override
+                public void onCaptureCompleted(@NonNull CameraCaptureSession session, @NonNull CaptureRequest request, @NonNull TotalCaptureResult result) {
+                    super.onCaptureCompleted(session, request, result);
+                    try {
+                        // 拍照完了重新开启预览
+                        mCameraCaptureSession.setRepeatingRequest(mPreviewRequest, null, null);
+                    } catch (CameraAccessException e) {
+                        e.printStackTrace();
+                    }
+                }
+            }, mChildHandler);
         } catch (CameraAccessException e) {
             e.printStackTrace();
         }
-    }
-
-    /**
-     * 新建一个Reader
-     *
-     * @return ImageReader
-     */
-    private ImageReader newReader() {
-        TextureView textureView = mTextureViewWeakReference.get();
-        if (textureView == null) return null;
-        ImageReader imageReader = ImageReader.newInstance(textureView.getWidth(), textureView.getHeight(), ImageFormat.JPEG, 1);
-        imageReader.setOnImageAvailableListener(this, mMainHandler);
-        return imageReader;
-    }
-
-    /**
-     * 停止预览
-     */
-    @Override
-    public void stopPreview() {
-        // 关掉相机设备
-        if (mCameraDevice != null) {
-            mCameraDevice.close();
-        }
-        // 关掉Reader
-        if (mImageReader != null) {
-            mImageReader.close();
-        }
-    }
-
-    /**
-     * 重启预览
-     */
-    @Override
-    public void restartPreview() {
-        if (mTextureViewWeakReference == null || mTextureViewWeakReference.get() == null) return;
-        if (mActivityWeakReference == null || mActivityWeakReference.get() == null) return;
-        startPreview(mTextureViewWeakReference.get(), mActivityWeakReference.get());
     }
 
     /**
@@ -228,7 +365,18 @@ public class CameraFeatureManager implements ImageReader.OnImageAvailableListene
                 if (bitmap == null) return;
                 // 旋转90度矩阵，因为拍出来的照片都是以横向拍摄为准，会导致图片看起来像被旋转了-90度
                 Matrix matrix = new Matrix();
-                matrix.postRotate(90);
+                switch (mCameraMode) {
+                    case CAMERA_FRONT_MODE:
+                        // 逆时针旋转
+                        matrix.postRotate(-90);
+                        // 水平反转
+                        matrix.postScale(-1, 1);
+                        break;
+                    case CAMERA_REAR_MODE:
+                        // 顺时针旋转
+                        matrix.postRotate(90);
+                        break;
+                }
                 // 得到旋转后的图片
                 Bitmap rotatedBitmap = Bitmap.createBitmap(bitmap, 0, 0, bitmap.getWidth(), bitmap.getHeight(), matrix, true);
                 // 文件名
@@ -245,75 +393,30 @@ public class CameraFeatureManager implements ImageReader.OnImageAvailableListene
                 // 资源清理
                 bitmap.recycle();
                 rotatedBitmap.recycle();
-                reader.close();
+                image.close();
             }
         });
     }
 
-    private class PreviewSessionStateCallback extends CameraCaptureSession.StateCallback {
-
-        @Override
-        public void onConfigured(@NonNull CameraCaptureSession cameraCaptureSession) {
-            // 当摄像头已经准备好时，开始显示预览
-            try {
-                // 预览请求Builder
-                CaptureRequest.Builder requestBuilder = mCameraDevice.createCaptureRequest(CameraDevice.TEMPLATE_PREVIEW);
-                // 设置图片输出目标
-                requestBuilder.addTarget(mSurface);
-                // 设置自动对焦模式
-                requestBuilder.set(CaptureRequest.CONTROL_AF_MODE, CaptureRequest.CONTROL_AF_MODE_CONTINUOUS_PICTURE);
-                // 设置自动曝光模式
-                requestBuilder.set(CaptureRequest.CONTROL_AE_MODE, CaptureRequest.CONTROL_AE_MODE_ON_AUTO_FLASH);
-                // 建立请求
-                CaptureRequest previewRequest = requestBuilder.build();
-                // 开始显示相机预览
-                cameraCaptureSession.setRepeatingRequest(previewRequest, null, null);
-            } catch (CameraAccessException e) {
-                e.printStackTrace();
-            }
-        }
-
-        @Override
-        public void onConfigureFailed(@NonNull CameraCaptureSession session) {
-
-        }
+    /**
+     * 新建一个Reader
+     *
+     * @return ImageReader
+     */
+    private ImageReader newReader() {
+        if (mTargetSize == null) return null;
+        ImageReader imageReader = ImageReader.newInstance(mTargetSize.getWidth(), mTargetSize.getHeight(), ImageFormat.JPEG, 1);
+        imageReader.setOnImageAvailableListener(this, mMainHandler);
+        return imageReader;
     }
 
-    private class CaptureSessionStateCallback extends CameraCaptureSession.StateCallback {
-
-        @Override
-        public void onConfigured(@NonNull CameraCaptureSession session) {
-            // 当摄像头已经准备好时，开始拍照
-            try {
-                // 创建拍照需要的CaptureRequest.Builder
-                final CaptureRequest.Builder captureRequestBuilder = mCameraDevice.createCaptureRequest(CameraDevice.TEMPLATE_STILL_CAPTURE);
-                // 将mImageReader的surface作为CaptureRequest.Builder的目标
-                captureRequestBuilder.addTarget(mImageReader.getSurface());
-                if (null == mCameraDevice) return;
-                // 自动对焦
-                captureRequestBuilder.set(CaptureRequest.CONTROL_AF_MODE, CaptureRequest.CONTROL_AF_MODE_CONTINUOUS_PICTURE);
-                // 自动闪光灯
-                captureRequestBuilder.set(CaptureRequest.CONTROL_AE_MODE, CaptureRequest.CONTROL_AE_MODE_ON_AUTO_FLASH);
-                // 拍照请求
-                CaptureRequest captureRequest = captureRequestBuilder.build();
-                // 开始拍照
-                session.capture(captureRequest, null, mChildHandler);
-            } catch (CameraAccessException e) {
-                e.printStackTrace();
-            }
-        }
-
-        @Override
-        public void onConfigureFailed(@NonNull CameraCaptureSession session) {
-
-        }
-    }
-
+    /**
+     * 相机打开完毕回调类
+     */
     private class CameraStateCallback extends CameraDevice.StateCallback {
 
         @Override
         public void onOpened(@NonNull CameraDevice camera) {
-            // 摄像头打开了
             try {
                 TextureView textureView = mTextureViewWeakReference.get();
                 if (textureView == null) return;
@@ -327,25 +430,21 @@ public class CameraFeatureManager implements ImageReader.OnImageAvailableListene
                 // 摄像头支持的输出尺寸
                 Size[] sizes = map.getOutputSizes(SurfaceTexture.class);
                 // 找到最接近于textureView的宽高比例的输出比例
-                Size targetSize = getCloselyPreSize(textureView.getWidth(), textureView.getHeight(), sizes);
-                // 原来textureView的Rect
-                RectF preRect = new RectF(0, 0, textureView.getWidth(), textureView.getHeight());
+                mTargetSize = getCloselyPreSize(mCameraRatio, textureView.getWidth(), sizes);
                 // scale为短的除以长的，这边targetSize的width指的是长的一边，比如1920x1080，width指的是1920，而长的一边在我们的应用中是height，所以现在把targetSize的width当成height，height当成width
-                float targetScale = 1F * targetSize.getHeight() / targetSize.getWidth();
+                float targetScale = 1F * mTargetSize.getHeight() / mTargetSize.getWidth();
                 // 高不变
-                int targetHeight = textureView.getHeight();
+                int targetHeight = (int) (textureView.getWidth() / targetScale);
                 // 宽为高乘以目标比例
-                int targetWidth = (int) (textureView.getHeight() * targetScale);
-                // 目标Rect
-                RectF targetRect = new RectF(0, 0, targetWidth, targetHeight);
-                // 变换矩阵
-                Matrix matrix = new Matrix();
-                matrix.setRectToRect(preRect, targetRect, Matrix.ScaleToFit.FILL);
-                // 宽高比例变换
-                textureView.setTransform(matrix);
+                int targetWidth = textureView.getWidth();
+                // 重新调整textureView宽高
+                RelativeLayout.LayoutParams layoutParams = (RelativeLayout.LayoutParams) textureView.getLayoutParams();
+                layoutParams.width = targetWidth;
+                layoutParams.height = targetHeight;
+                textureView.setLayoutParams(layoutParams);
                 // 设置缓冲区大小
                 SurfaceTexture texture = textureView.getSurfaceTexture();
-                texture.setDefaultBufferSize(targetSize.getWidth(), targetSize.getHeight());
+                texture.setDefaultBufferSize(mTargetSize.getWidth(), mTargetSize.getHeight());
                 // TextureView的Surface
                 mSurface = new Surface(texture);
                 if (mImageReader != null) {
@@ -370,4 +469,23 @@ public class CameraFeatureManager implements ImageReader.OnImageAvailableListene
 
         }
     }
+
+    /**
+     * 预览Session准备完毕回调类
+     */
+    private class PreviewSessionStateCallback extends CameraCaptureSession.StateCallback {
+
+        @Override
+        public void onConfigured(@NonNull CameraCaptureSession cameraCaptureSession) {
+            mCameraCaptureSession = cameraCaptureSession;
+            // 开启预览
+            sessionPreview();
+        }
+
+        @Override
+        public void onConfigureFailed(@NonNull CameraCaptureSession session) {
+
+        }
+    }
+
 }

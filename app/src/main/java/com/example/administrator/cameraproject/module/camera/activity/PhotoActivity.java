@@ -24,6 +24,7 @@ public class PhotoActivity extends AppCompatActivity implements IPhotoView {
 
     // 显示照片的ImageView
     private ImageView mIvPhoto;
+    // presenter
     private IPhotoPresenter mPhotoPresenter;
     // 加载过请求了
     private boolean mIsLoaded = false;

@@ -18,6 +18,7 @@ import java.util.concurrent.TimeUnit;
 
 
 /**
+ * 照片Model层
  * Edited by Administrator on 2018/4/10.
  */
 
@@ -107,7 +108,9 @@ public class PhotoLoader implements IPhotoModel {
 
         abstract void call();
 
-        // post到主线程并记录下这个runnable，在runnable执行时记录被移除，Activity在onDestroy的时候遍历这些记录的runnable并通过handler从MessageQueue中移除
+        /**
+         * post到主线程
+         */
         void postMainThread(Runnable runnable) {
             synchronized (mMainHandler) {
                 mMainHandler.post(runnable);

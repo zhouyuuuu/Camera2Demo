@@ -4,6 +4,7 @@ import android.app.Activity;
 import android.view.TextureView;
 
 /**
+ * 相机功能业务层
  * Edited by Administrator on 2018/4/10.
  */
 
@@ -42,4 +43,23 @@ public interface ICameraFeaturePresenter {
      * @param fileName 图片文件名
      */
     void onPhotoToken(String fileName);
+
+    /**
+     * 改变相机模式（前后置）
+     */
+    void changeCamera();
+
+    /**
+     * 改变照片比例
+     *
+     * @param ratio 比例
+     */
+    void setCameraRatio(float ratio);
+
+    /**
+     * 改变闪关灯模式
+     *
+     * @param flashMode 模式
+     */
+    void setFlashMode(int flashMode);
 }

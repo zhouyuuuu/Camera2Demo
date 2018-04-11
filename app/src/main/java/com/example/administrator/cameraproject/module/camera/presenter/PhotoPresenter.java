@@ -12,6 +12,7 @@ import com.example.administrator.cameraproject.module.camera.view.IPhotoView;
 import java.lang.ref.WeakReference;
 
 /**
+ * 照片业务层
  * Edited by Administrator on 2018/4/10.
  */
 

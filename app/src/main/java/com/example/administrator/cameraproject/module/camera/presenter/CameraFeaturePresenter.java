@@ -12,18 +12,19 @@ import com.example.administrator.cameraproject.module.camera.view.ICameraFeature
 import java.lang.ref.WeakReference;
 
 /**
+ * 相机功能业务层
  * Edited by Administrator on 2018/4/10.
  */
 
 @RequiresApi(api = Build.VERSION_CODES.LOLLIPOP)
 public class CameraFeaturePresenter implements ICameraFeaturePresenter {
 
-    private ICameraFeatureManager cameraFeatureManager;
-    private WeakReference<ICameraFeatureView> cameraFeatureViewWeakReference;
+    private ICameraFeatureManager mCameraFeatureManager;
+    private WeakReference<ICameraFeatureView> mCameraFeatureViewWeakReference;
 
     public CameraFeaturePresenter(ICameraFeatureView iCameraFeatureView) {
-        this.cameraFeatureManager = new CameraFeatureManager(this);
-        cameraFeatureViewWeakReference = new WeakReference<>(iCameraFeatureView);
+        this.mCameraFeatureManager = new CameraFeatureManager(this);
+        mCameraFeatureViewWeakReference = new WeakReference<>(iCameraFeatureView);
     }
 
     /**
@@ -34,7 +35,7 @@ public class CameraFeaturePresenter implements ICameraFeaturePresenter {
      */
     @Override
     public void startPreview(TextureView textureView, Activity activity) {
-        cameraFeatureManager.startPreview(textureView, activity);
+        mCameraFeatureManager.openCameraAndStartPreview(textureView, activity);
     }
 
     /**
@@ -42,9 +43,9 @@ public class CameraFeaturePresenter implements ICameraFeaturePresenter {
      */
     @Override
     public void onDestroy() {
-        cameraFeatureViewWeakReference.clear();
-        cameraFeatureViewWeakReference = null;
-        cameraFeatureManager.onDestroy();
+        mCameraFeatureViewWeakReference.clear();
+        mCameraFeatureViewWeakReference = null;
+        mCameraFeatureManager.onDestroy();
     }
 
     /**
@@ -52,7 +53,7 @@ public class CameraFeaturePresenter implements ICameraFeaturePresenter {
      */
     @Override
     public void onStop() {
-        cameraFeatureManager.stopPreview();
+        mCameraFeatureManager.stopCameraAndPreview();
     }
 
     /**
@@ -60,7 +61,7 @@ public class CameraFeaturePresenter implements ICameraFeaturePresenter {
      */
     @Override
     public void onRestart() {
-        cameraFeatureManager.restartPreview();
+        mCameraFeatureManager.openCameraAndStartPreview();
     }
 
     /**
@@ -68,7 +69,7 @@ public class CameraFeaturePresenter implements ICameraFeaturePresenter {
      */
     @Override
     public void takePhoto() {
-        cameraFeatureManager.takePhoto();
+        mCameraFeatureManager.takePhoto();
     }
 
     /**
@@ -78,8 +79,36 @@ public class CameraFeaturePresenter implements ICameraFeaturePresenter {
      */
     @Override
     public void onPhotoToken(String fileName) {
-        ICameraFeatureView iCameraFeatureView = cameraFeatureViewWeakReference.get();
+        ICameraFeatureView iCameraFeatureView = mCameraFeatureViewWeakReference.get();
         if (iCameraFeatureView == null) return;
         iCameraFeatureView.onPhotoToken(fileName);
+    }
+
+    /**
+     * 改变相机模式（前后置）
+     */
+    @Override
+    public void changeCamera() {
+        mCameraFeatureManager.changeCameraMode();
+    }
+
+    /**
+     * 改变照片比例
+     *
+     * @param ratio 比例
+     */
+    @Override
+    public void setCameraRatio(float ratio) {
+        mCameraFeatureManager.setCameraRatio(ratio);
+    }
+
+    /**
+     * 改变闪关灯模式
+     *
+     * @param flashMode 模式
+     */
+    @Override
+    public void setFlashMode(int flashMode) {
+        mCameraFeatureManager.setFlashMode(flashMode);
     }
 }

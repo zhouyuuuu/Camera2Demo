@@ -4,6 +4,7 @@ import android.graphics.Bitmap;
 import android.widget.ImageView;
 
 /**
+ * 照片业务层
  * Edited by Administrator on 2018/4/10.
  */
 

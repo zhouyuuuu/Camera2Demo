@@ -1,6 +1,7 @@
 package com.example.administrator.cameraproject.module.camera.view;
 
 /**
+ * 相机功能视图层
  * Edited by Administrator on 2018/4/10.
  */
 
