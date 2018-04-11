@@ -66,7 +66,7 @@ public class CameraActivity extends AppCompatActivity implements View.OnClickLis
         mTextureView.setSurfaceTextureListener(this);
         mCameraFeaturePresenter = new CameraFeaturePresenter(this);
         // 16比9、4比3、1比1三种尺寸比例
-        scales = new float[]{16f / 9, 4f / 3, 1f};
+        scales = new float[]{CameraConfig.CAMERA_PHOTI_RATIO_16_9, CameraConfig.CAMERA_PHOTI_RATIO_4_3, CameraConfig.CAMERA_PHOTI_RATIO_1_1};
         // 关闭、打开、常亮三种闪光模式
         modes = new int[]{CameraConfig.FLASH_OFF, CameraConfig.FLASH_ON, CameraConfig.FLASH_ALWAYS};
         // 三种图标对应关闭、打开、常亮

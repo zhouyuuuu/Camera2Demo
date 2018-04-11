@@ -48,14 +48,10 @@ import java.util.Arrays;
 @RequiresApi(api = Build.VERSION_CODES.LOLLIPOP)
 public class CameraFeatureManager implements ImageReader.OnImageAvailableListener, ICameraFeatureManager {
 
-    // 后置模式
-    private static final int CAMERA_REAR_MODE = 101;
-    // 前置模式
-    private static final int CAMERA_FRONT_MODE = 102;
     // 子线程名
     private static final String THREAD_NAME = "cameraThread";
     // 默认后置摄像头
-    private int mCameraMode = CAMERA_REAR_MODE;
+    private int mCameraMode = CameraConfig.CAMERA_REAR_MODE;
     // 默认是后置摄像头
     private String mCameraID = CameraConfig.CAMERA_REAR_ID;
     // 主线程handler
@@ -87,7 +83,7 @@ public class CameraFeatureManager implements ImageReader.OnImageAvailableListene
     // 默认闪光模式为关闭
     private int mFlashMode = CameraConfig.FLASH_OFF;
     // 默认照片比例为16比9
-    private float mCameraRatio = 16f / 9;
+    private float mCameraRatio = CameraConfig.CAMERA_PHOTI_RATIO_16_9;
 
     public CameraFeatureManager(ICameraFeaturePresenter iCameraFeaturePresenter) {
         this.mMainHandler = new Handler(Looper.getMainLooper());
@@ -201,13 +197,13 @@ public class CameraFeatureManager implements ImageReader.OnImageAvailableListene
     public void changeCameraMode() {
         // 前后置转换
         switch (mCameraMode) {
-            case CAMERA_FRONT_MODE:
+            case CameraConfig.CAMERA_FRONT_MODE:
                 mCameraID = CameraConfig.CAMERA_REAR_ID;
-                mCameraMode = CAMERA_REAR_MODE;
+                mCameraMode = CameraConfig.CAMERA_REAR_MODE;
                 break;
-            case CAMERA_REAR_MODE:
+            case CameraConfig.CAMERA_REAR_MODE:
                 mCameraID = CameraConfig.CAMERA_FRONT_ID;
-                mCameraMode = CAMERA_FRONT_MODE;
+                mCameraMode = CameraConfig.CAMERA_FRONT_MODE;
                 break;
         }
         // 重新打开相机预览
@@ -298,7 +294,8 @@ public class CameraFeatureManager implements ImageReader.OnImageAvailableListene
             // 根据mFlashMode决定开不开闪光灯
             switch (mFlashMode) {
                 case CameraConfig.FLASH_ALWAYS:
-                    captureRequestBuilder.set(CaptureRequest.CONTROL_AE_MODE, CaptureRequest.CONTROL_AE_MODE_ON_ALWAYS_FLASH);
+                    captureRequestBuilder.set(CaptureRequest.CONTROL_AE_MODE, CaptureRequest.CONTROL_AE_MODE_ON);
+                    captureRequestBuilder.set(CaptureRequest.FLASH_MODE, CaptureRequest.FLASH_MODE_TORCH);
                     break;
                 case CameraConfig.FLASH_OFF:
                     captureRequestBuilder.set(CaptureRequest.CONTROL_AE_MODE, CaptureRequest.CONTROL_AE_MODE_ON);
@@ -366,15 +363,15 @@ public class CameraFeatureManager implements ImageReader.OnImageAvailableListene
                 // 旋转90度矩阵，因为拍出来的照片都是以横向拍摄为准，会导致图片看起来像被旋转了-90度
                 Matrix matrix = new Matrix();
                 switch (mCameraMode) {
-                    case CAMERA_FRONT_MODE:
+                    case CameraConfig.CAMERA_FRONT_MODE:
                         // 逆时针旋转
-                        matrix.postRotate(-90);
+                        matrix.postRotate(CameraConfig.CAMERA_FRONT_PHOTO_REVISE_DEGREE);
                         // 水平反转
                         matrix.postScale(-1, 1);
                         break;
-                    case CAMERA_REAR_MODE:
+                    case CameraConfig.CAMERA_REAR_MODE:
                         // 顺时针旋转
-                        matrix.postRotate(90);
+                        matrix.postRotate(CameraConfig.CAMERA_REAR_PHOTO_REVISE_DEGREE);
                         break;
                 }
                 // 得到旋转后的图片

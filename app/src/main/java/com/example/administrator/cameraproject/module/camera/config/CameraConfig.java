@@ -30,4 +30,18 @@ public class CameraConfig {
     public static final int FLASH_ALWAYS = 2;
     // 闪光灯打开
     public static final int FLASH_ON = 3;
+    // 后置模式
+    public static final int CAMERA_REAR_MODE = 101;
+    // 前置模式
+    public static final int CAMERA_FRONT_MODE = 102;
+    // 前置摄像头照片修正角度
+    public static final int CAMERA_FRONT_PHOTO_REVISE_DEGREE = -90;
+    // 前置摄像头照片修正角度
+    public static final int CAMERA_REAR_PHOTO_REVISE_DEGREE = 90;
+    // 照片比例16比9
+    public static final float CAMERA_PHOTI_RATIO_16_9 = 16F/9;
+    // 照片比例4比3
+    public static final float CAMERA_PHOTI_RATIO_4_3 = 4F/3;
+    // 照片比例1比1
+    public static final float CAMERA_PHOTI_RATIO_1_1 = 1F;
 }
