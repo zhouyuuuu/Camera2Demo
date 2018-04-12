@@ -15,4 +15,9 @@ public interface IPhotoModel {
      * @param imageView imageView
      */
     void loadBitmap(String fileName, ImageView imageView);
+
+    /**
+     * 销毁
+     */
+    void onDestroy();
 }

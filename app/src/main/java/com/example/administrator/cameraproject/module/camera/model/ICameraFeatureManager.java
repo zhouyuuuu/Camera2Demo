@@ -63,4 +63,11 @@ public interface ICameraFeatureManager {
      * @param y x
      */
     void setFocusPoint(int x, int y);
+
+    /**
+     * 设置缩放
+     *
+     * @param distance 缩放量
+     */
+    void setScale(int distance);
 }

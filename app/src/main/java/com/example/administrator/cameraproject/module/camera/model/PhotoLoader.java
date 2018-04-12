@@ -28,14 +28,14 @@ public class PhotoLoader implements IPhotoModel {
     // 主线程Handler
     private final Handler mMainHandler;
     // presenter
-    private IPhotoPresenter iPhotoPresenter;
+    private IPhotoPresenter mPhotoPresenter;
     // 线程池
-    private ThreadPoolExecutor threadPoolExecutor;
+    private ThreadPoolExecutor mThreadPoolExecutor;
 
     public PhotoLoader(IPhotoPresenter iPhotoPresenter) {
-        this.iPhotoPresenter = iPhotoPresenter;
+        this.mPhotoPresenter = iPhotoPresenter;
         mMainHandler = new Handler(Looper.getMainLooper());
-        threadPoolExecutor = new ThreadPoolExecutor(1, 1, 1000, TimeUnit.SECONDS, new PriorityBlockingQueue<Runnable>());
+        mThreadPoolExecutor = new ThreadPoolExecutor(1, 1, 1000, TimeUnit.SECONDS, new PriorityBlockingQueue<Runnable>());
     }
 
     /**
@@ -47,8 +47,17 @@ public class PhotoLoader implements IPhotoModel {
     @Override
     public void loadBitmap(final String fileName, final ImageView imageView) {
         if (fileName != null) {
-            threadPoolExecutor.execute(new LoadBitmapRunnable(1, fileName, imageView));
+            mThreadPoolExecutor.execute(new LoadBitmapRunnable(1, fileName, imageView));
         }
+    }
+
+    /**
+     * 终结线程池，释放引用
+     */
+    @Override
+    public void onDestroy() {
+        mThreadPoolExecutor.shutdownNow();
+        mPhotoPresenter = null;
     }
 
     /**
@@ -73,7 +82,7 @@ public class PhotoLoader implements IPhotoModel {
                 @Override
                 public void run() {
                     // 同步回调
-                    iPhotoPresenter.photoLoaded(bitmap);
+                    mPhotoPresenter.photoLoaded(bitmap);
                 }
             });
         }

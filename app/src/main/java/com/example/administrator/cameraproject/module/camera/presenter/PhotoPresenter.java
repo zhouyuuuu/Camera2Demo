@@ -19,7 +19,9 @@ import java.lang.ref.WeakReference;
 @RequiresApi(api = Build.VERSION_CODES.LOLLIPOP)
 public class PhotoPresenter implements IPhotoPresenter {
 
+    // View层弱引用
     private WeakReference<IPhotoView> mPhotoViewWeakReference;
+    // model
     private IPhotoModel mPhotoModel;
 
     public PhotoPresenter(IPhotoView iPhotoView) {
@@ -51,7 +53,7 @@ public class PhotoPresenter implements IPhotoPresenter {
     }
 
     /**
-     * 清楚弱引用
+     * 清楚弱引用,model层销毁
      */
     @Override
     public void onDestroy() {
@@ -59,5 +61,6 @@ public class PhotoPresenter implements IPhotoPresenter {
             mPhotoViewWeakReference.clear();
             mPhotoViewWeakReference = null;
         }
+        mPhotoModel.onDestroy();
     }
 }

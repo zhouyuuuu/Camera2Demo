@@ -24,8 +24,6 @@ public class CameraConfig {
     public static final String CAMERA_FRONT_ID = "" + CameraCharacteristics.LENS_FACING_BACK;
     // 闪光灯关闭
     public static final int FLASH_OFF = 0;
-    // 闪光灯自动
-    public static final int FLASH_AUTO = 1;
     // 闪光灯常亮
     public static final int FLASH_ALWAYS = 2;
     // 闪光灯打开
@@ -48,4 +46,16 @@ public class CameraConfig {
     public static final float FOCUS_WIDTH_RATIO_DEFAULT = 0.5f;
     // 焦点占height比
     public static final float FOCUS_HEIGHT_RATIO_DEFAULT = 0.5f;
+    // 对焦区域默认宽度
+    public static final int FOCUS_AREA_WIDTH = 20;
+    // 对焦区域默认宽度
+    public static final int FOCUS_AREA_HEIGHT = 20;
+    // 照片预览缩放最大left占width比例
+    public static final float CAMERA_SCALE_LEFT_PERCENT = 1f / 4;
+    // 照片预览缩放最大left占width比例
+    public static final float CAMERA_SCALE_TOP_PERCENT = 1f / 4;
+    // 照片预览缩放最大left占width比例
+    public static final float CAMERA_SCALE_RIGHT_PERCENT = 3f / 4;
+    // 照片预览缩放最大left占width比例
+    public static final float CAMERA_SCALE_BOTTOM_PERCENT = 3f / 4;
 }

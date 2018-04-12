@@ -27,7 +27,6 @@ import android.os.Looper;
 import android.support.annotation.NonNull;
 import android.support.annotation.RequiresApi;
 import android.support.v4.app.ActivityCompat;
-import android.util.Log;
 import android.util.Size;
 import android.view.Surface;
 import android.view.TextureView;
@@ -42,10 +41,8 @@ import java.lang.ref.WeakReference;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
 
-import static android.content.ContentValues.TAG;
-
 /**
- * 相机功能管理者，Model，管理闪光灯、比例、镜头、预览、拍照
+ * 相机功能管理者，Model，管理闪光灯、比例、镜头、预览、拍照、对焦、缩放
  * Edited by Administrator on 2018/4/10.
  */
 
@@ -93,7 +90,27 @@ public class CameraFeatureManager implements ImageReader.OnImageAvailableListene
     // 焦点占height比
     private float mFocusHeightRatio = CameraConfig.FOCUS_HEIGHT_RATIO_DEFAULT;
     // 获取的图像对应的rect
-    private Rect mRect;
+    private Rect mRectOriginal;
+    // 拍照最大放大left
+    private int mRectMaxLeft;
+    // 拍照最大放大right
+    private int mRectMaxRight;
+    // 拍照最大放大top
+    private int mRectMaxTop;
+    // 拍照最大放大bottom
+    private int mRectMaxBottom;
+    // 拍照最小缩小left
+    private int mRectMinLeft;
+    // 拍照最小缩小right
+    private int mRectMinRight;
+    // 拍照最小缩小top
+    private int mRectMinTop;
+    // 拍照最小缩小bottom
+    private int mRectMinBottom;
+    // 缩放后的rect
+    private Rect mRectScale;
+    // 相机是否打开
+    private boolean mCameraIsOpen;
 
     public CameraFeatureManager(ICameraFeaturePresenter iCameraFeaturePresenter) {
         this.mMainHandler = new Handler(Looper.getMainLooper());
@@ -133,15 +150,71 @@ public class CameraFeatureManager implements ImageReader.OnImageAvailableListene
     }
 
     /**
+     * 设置缩放，缩放不小于原来Rect的1倍，不大于原来Rect的4倍
+     *
+     * @param distance 缩放量
+     */
+    public void setScale(int distance) {
+        if (distance == 0) return;
+        Rect curRect;
+        if (mRectScale != null) {
+            curRect = mRectScale;
+        } else {
+            curRect = mRectOriginal;
+        }
+        int left = curRect.left + distance;
+        int right = curRect.right - distance;
+        int top = curRect.top + distance;
+        int bottom = curRect.bottom - distance;
+        // 如果大于0是放大，放大不能超过各个限定值如left不能大于最大的left，缩小同理
+        if (distance > 0) {
+            if (left > mRectMaxLeft) {
+                left = mRectMaxLeft;
+            }
+            if (right < mRectMaxRight) {
+                right = mRectMaxRight;
+            }
+            if (top > mRectMaxTop) {
+                top = mRectMaxTop;
+            }
+            if (bottom < mRectMaxBottom) {
+                bottom = mRectMaxBottom;
+            }
+        } else {
+            if (left < mRectMinLeft) {
+                left = mRectMinLeft;
+            }
+            if (right > mRectMinRight) {
+                right = mRectMinRight;
+            }
+            if (top < mRectMinTop) {
+                top = mRectMinTop;
+            }
+            if (bottom > mRectMinBottom) {
+                bottom = mRectMinBottom;
+            }
+        }
+        // 建立新的缩放Rect
+        mRectScale = new Rect(left, top, right, bottom);
+        // 重新打开预览
+        sessionStopPreview();
+        sessionPreview();
+    }
+
+    /**
      * 设置焦点在图像中的x比和y比
      *
      * @param x x
      * @param y x
      */
+    @Override
     public void setFocusPoint(int x, int y) {
         TextureView textureView = mTextureViewWeakReference.get();
+        // 焦点在屏幕中的x相对位置百分比
         mFocusWidthRatio = 1f * x / textureView.getWidth();
+        // 焦点在屏幕中的y相对位置百分比
         mFocusHeightRatio = 1f * y / textureView.getHeight();
+        // 重新打开预览
         sessionStopPreview();
         sessionPreview();
     }
@@ -153,8 +226,10 @@ public class CameraFeatureManager implements ImageReader.OnImageAvailableListene
      */
     @Override
     public void setFlashMode(int flashMode) {
+        // 设置闪光模式，如果从常亮模式切换到别的模式或者别的模式切换到常亮，要重新打开预览
         if (flashMode == CameraConfig.FLASH_ALWAYS || mFlashMode == CameraConfig.FLASH_ALWAYS) {
             mFlashMode = flashMode;
+            // 重新打开预览
             sessionStopPreview();
             sessionPreview();
         } else {
@@ -166,8 +241,11 @@ public class CameraFeatureManager implements ImageReader.OnImageAvailableListene
      * session停止预览
      */
     private void sessionStopPreview() {
+        // 这边相机没有打开时不得操作session否则会崩溃
+        if (!mCameraIsOpen) return;
         if (mCameraCaptureSession != null) {
             try {
+                // 关闭预览
                 mCameraCaptureSession.stopRepeating();
             } catch (CameraAccessException e) {
                 e.printStackTrace();
@@ -179,6 +257,8 @@ public class CameraFeatureManager implements ImageReader.OnImageAvailableListene
      * session开启预览
      */
     private void sessionPreview() {
+        // 这边相机没有打开时不得操作session否则会崩溃
+        if (!mCameraIsOpen) return;
         if (mCameraCaptureSession == null) return;
         if (mCameraDevice == null) return;
         if (mSurface == null) return;
@@ -191,19 +271,34 @@ public class CameraFeatureManager implements ImageReader.OnImageAvailableListene
             requestBuilder.set(CaptureRequest.CONTROL_AF_MODE, CaptureRequest.CONTROL_AF_MODE_CONTINUOUS_PICTURE);
             // 对焦区域
             android.hardware.camera2.params.MeteringRectangle[] meteringRectangles = new android.hardware.camera2.params.MeteringRectangle[1];
-            // 焦点区域左边，rect是横屏的，rect的right对应了竖屏的activity中view的height，因此是right乘以高度比
-            int x = (int) (mRect.right * mFocusHeightRatio) - 5;
-            // 这边防止-5后小于0
-            if (x < 0) x = 0;
-            // 焦点区域上边，这边（1-宽度比）是因为竖屏模式下，view的坐标原点在屏幕左上角，rect的坐标点在屏幕右上角
-            int y = (int) (mRect.bottom * (1f - mFocusWidthRatio)) - 5;
-            // 这边防止-5后小于0
-            if (y < 0) y = 0;
+            // 焦点坐标
+            int x, y;
+            // 是否目前有缩放
+            if (mRectScale == null) {
+                // 焦点区域左边，rect是横屏的，rect的right对应了竖屏的activity中view的height，因此是right乘以高度比
+                x = (int) (mRectOriginal.right * mFocusHeightRatio);
+                // 防止-5后小于0
+                if (x < 0) x = 0;
+                // 焦点区域上边，这边（1-宽度比）是因为竖屏模式下，view的坐标原点在屏幕左上角，rect的坐标点在屏幕右上角
+                y = (int) (mRectOriginal.bottom * (1f - mFocusWidthRatio));
+                // 防止-5后小于0
+                if (y < 0) y = 0;
+            } else {
+                // 设置缩放
+                requestBuilder.set(CaptureRequest.SCALER_CROP_REGION, mRectScale);
+                // 通过宽度乘以比例得到焦点在RectScale上的坐标x，然后加上目前看不到的原Rect左边部分距离，就得到焦点在原Rect上的坐标x
+                x = (int) ((mRectScale.right - mRectScale.left) * mFocusHeightRatio) + mRectScale.left;
+                // 防止-5后小于0
+                if (x < 0) x = 0;
+                // 焦点区域上边，计算原理同x
+                y = (int) ((mRectScale.bottom - mRectScale.top) * (1f - mFocusWidthRatio)) + mRectScale.top;
+                // 防止-5后小于0
+                if (y < 0) y = 0;
+            }
             // 焦点区域宽度
-            int width = 10;
+            int width = CameraConfig.FOCUS_AREA_WIDTH;
             // 焦点区域高度
-            int height = 10;
-            Log.e(TAG, "sessionPreview: " + x + " " + y);
+            int height = CameraConfig.FOCUS_AREA_HEIGHT;
             // 新建对焦区域对象
             meteringRectangles[0] = new android.hardware.camera2.params.MeteringRectangle(x, y, width, height, 1);
             // 设置对焦区域
@@ -231,8 +326,11 @@ public class CameraFeatureManager implements ImageReader.OnImageAvailableListene
      */
     @Override
     public void setCameraRatio(float cameraRatio) {
+        // 设置照片比例
         this.mCameraRatio = cameraRatio;
+        // 关掉相机和预览
         stopCameraAndPreview();
+        // 启动相机和预览
         openCameraAndStartPreview();
     }
 
@@ -262,6 +360,7 @@ public class CameraFeatureManager implements ImageReader.OnImageAvailableListene
      */
     @Override
     public void stopCameraAndPreview() {
+        mCameraIsOpen = false;
         // 关掉相机设备
         if (mCameraDevice != null) {
             mCameraDevice.close();
@@ -351,6 +450,10 @@ public class CameraFeatureManager implements ImageReader.OnImageAvailableListene
                     captureRequestBuilder.set(CaptureRequest.CONTROL_AE_MODE, CaptureRequest.CONTROL_AE_MODE_ON);
                     captureRequestBuilder.set(CaptureRequest.FLASH_MODE, CaptureRequest.FLASH_MODE_TORCH);
                     break;
+            }
+            // 设置缩放
+            if (mRectScale != null) {
+                captureRequestBuilder.set(CaptureRequest.SCALER_CROP_REGION, mRectScale);
             }
             // 拍照请求
             CaptureRequest captureRequest = captureRequestBuilder.build();
@@ -466,8 +569,18 @@ public class CameraFeatureManager implements ImageReader.OnImageAvailableListene
                 mCameraDevice = camera;
                 // 控制摄像头属性的对象
                 CameraCharacteristics characteristics = mCameraManager.getCameraCharacteristics(mCameraID);
-                // 拍摄图像的Rect，设置焦点区域时根据该Rect的长宽来设置
-                mRect = characteristics.get(CameraCharacteristics.SENSOR_INFO_ACTIVE_ARRAY_SIZE);
+                // 拍摄图像的Rect，设置焦点区域时根据该Rect的长宽来设置，并设置缩放的最大最小值
+                mRectOriginal = characteristics.get(CameraCharacteristics.SENSOR_INFO_ACTIVE_ARRAY_SIZE);
+                if (mRectOriginal != null) {
+                    mRectMaxLeft = (int) (mRectOriginal.right * CameraConfig.CAMERA_SCALE_LEFT_PERCENT);
+                    mRectMaxRight = (int) (mRectOriginal.right * CameraConfig.CAMERA_SCALE_RIGHT_PERCENT);
+                    mRectMaxTop = (int) (mRectOriginal.bottom * CameraConfig.CAMERA_SCALE_TOP_PERCENT);
+                    mRectMaxBottom = (int) (mRectOriginal.bottom * CameraConfig.CAMERA_SCALE_BOTTOM_PERCENT);
+                    mRectMinLeft = mRectOriginal.left;
+                    mRectMinRight = mRectOriginal.right;
+                    mRectMinTop = mRectOriginal.top;
+                    mRectMinBottom = mRectOriginal.bottom;
+                }
                 // 获取摄像头支持的配置属性
                 StreamConfigurationMap map = characteristics.get(CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP);
                 // 获取摄像头支持的最大尺寸
@@ -499,6 +612,8 @@ public class CameraFeatureManager implements ImageReader.OnImageAvailableListene
                 if (mImageReader == null) return;
                 // 创建预览Session
                 camera.createCaptureSession(Arrays.asList(mSurface, mImageReader.getSurface()), new PreviewSessionStateCallback(), mMainHandler);
+                // 标记相机已打开
+                mCameraIsOpen = true;
             } catch (CameraAccessException e) {
                 e.printStackTrace();
             }

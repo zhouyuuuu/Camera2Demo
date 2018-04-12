@@ -26,14 +26,22 @@ public class PhotoActivity extends AppCompatActivity implements IPhotoView {
     private ImageView mIvPhoto;
     // presenter
     private IPhotoPresenter mPhotoPresenter;
-    // 加载过请求了
+    // 是否加载过请求了
     private boolean mIsLoaded = false;
 
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.photo_activity);
+        initView();
+        initData();
+    }
+
+    private void initView(){
         mIvPhoto = findViewById(R.id.iv_photo);
+    }
+
+    private void initData(){
         mPhotoPresenter = new PhotoPresenter(this);
     }
 
@@ -67,6 +75,9 @@ public class PhotoActivity extends AppCompatActivity implements IPhotoView {
         mIvPhoto.setImageBitmap(bitmap);
     }
 
+    /**
+     * presenter也要销毁
+     */
     @Override
     protected void onDestroy() {
         super.onDestroy();

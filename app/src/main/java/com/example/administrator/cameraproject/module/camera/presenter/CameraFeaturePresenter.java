@@ -122,4 +122,14 @@ public class CameraFeaturePresenter implements ICameraFeaturePresenter {
     public void setFocusPoint(int x, int y) {
         mCameraFeatureManager.setFocusPoint(x, y);
     }
+
+    /**
+     * 设置缩放
+     *
+     * @param distance 缩放量
+     */
+    @Override
+    public void setScale(int distance) {
+        mCameraFeatureManager.setScale(distance);
+    }
 }
