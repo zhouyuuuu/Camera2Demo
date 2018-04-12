@@ -13,13 +13,13 @@ import android.widget.ImageView;
 import com.example.administrator.cameraproject.R;
 import com.example.administrator.cameraproject.module.camera.config.CameraConfig;
 import com.example.administrator.cameraproject.module.camera.presenter.CameraFeaturePresenter;
-import com.example.administrator.cameraproject.module.camera.view.ICameraFeatureView;
+import com.example.administrator.cameraproject.module.camera.view.ICameraView;
 import com.example.administrator.cameraproject.module.camera.widget.CustomTextureView;
 
 @RequiresApi(api = Build.VERSION_CODES.LOLLIPOP)
 public class CameraActivity extends AppCompatActivity implements View.OnClickListener
         , TextureView.SurfaceTextureListener
-        , ICameraFeatureView
+        , ICameraView
         , CustomTextureView.OnScaleListener
         , CustomTextureView.OnFocusListener {
 

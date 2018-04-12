@@ -109,8 +109,8 @@ public class CameraFeatureManager implements ImageReader.OnImageAvailableListene
     private int mRectMinBottom;
     // 缩放后的rect
     private Rect mRectScale;
-    // 相机是否打开
-    private boolean mCameraIsOpen;
+    // session是否准备好
+    private boolean mSessionConfigured = false;
 
     public CameraFeatureManager(ICameraFeaturePresenter iCameraFeaturePresenter) {
         this.mMainHandler = new Handler(Looper.getMainLooper());
@@ -167,38 +167,21 @@ public class CameraFeatureManager implements ImageReader.OnImageAvailableListene
         int top = curRect.top + distance;
         int bottom = curRect.bottom - distance;
         // 如果大于0是放大，放大不能超过各个限定值如left不能大于最大的left，缩小同理
-        if (distance > 0) {
-            if (left > mRectMaxLeft) {
-                left = mRectMaxLeft;
-            }
-            if (right < mRectMaxRight) {
-                right = mRectMaxRight;
-            }
-            if (top > mRectMaxTop) {
-                top = mRectMaxTop;
-            }
-            if (bottom < mRectMaxBottom) {
-                bottom = mRectMaxBottom;
-            }
-        } else {
-            if (left < mRectMinLeft) {
-                left = mRectMinLeft;
-            }
-            if (right > mRectMinRight) {
-                right = mRectMinRight;
-            }
-            if (top < mRectMinTop) {
-                top = mRectMinTop;
-            }
-            if (bottom > mRectMinBottom) {
-                bottom = mRectMinBottom;
-            }
+        if (left <= mRectMinLeft || right >= mRectMinRight || top <= mRectMinTop || bottom >= mRectMinBottom
+                || left > mRectMaxLeft || right < mRectMaxRight || top > mRectMaxTop || bottom < mRectMaxBottom) {
+            return;
         }
         // 建立新的缩放Rect
         mRectScale = new Rect(left, top, right, bottom);
         // 重新打开预览
-        sessionStopPreview();
-        sessionPreview();
+        try {
+            sessionStopPreview();
+            sessionPreview();
+        } catch (CameraAccessException e) {
+            // 出事了就重新打开相机
+            openCameraAndStartPreview();
+            e.printStackTrace();
+        }
     }
 
     /**
@@ -215,8 +198,13 @@ public class CameraFeatureManager implements ImageReader.OnImageAvailableListene
         // 焦点在屏幕中的y相对位置百分比
         mFocusHeightRatio = 1f * y / textureView.getHeight();
         // 重新打开预览
-        sessionStopPreview();
-        sessionPreview();
+        try {
+//            sessionStopPreview();
+            sessionPreview();
+        } catch (CameraAccessException e) {
+            openCameraAndStartPreview();
+            e.printStackTrace();
+        }
     }
 
     /**
@@ -230,8 +218,13 @@ public class CameraFeatureManager implements ImageReader.OnImageAvailableListene
         if (flashMode == CameraConfig.FLASH_ALWAYS || mFlashMode == CameraConfig.FLASH_ALWAYS) {
             mFlashMode = flashMode;
             // 重新打开预览
-            sessionStopPreview();
-            sessionPreview();
+            try {
+                sessionStopPreview();
+                sessionPreview();
+            } catch (CameraAccessException e) {
+                openCameraAndStartPreview();
+                e.printStackTrace();
+            }
         } else {
             mFlashMode = flashMode;
         }
@@ -240,14 +233,14 @@ public class CameraFeatureManager implements ImageReader.OnImageAvailableListene
     /**
      * session停止预览
      */
-    private void sessionStopPreview() {
-        // 这边相机没有打开时不得操作session否则会崩溃
-        if (!mCameraIsOpen) return;
+    private void sessionStopPreview() throws android.hardware.camera2.CameraAccessException {
+        if (!mSessionConfigured) return;
         if (mCameraCaptureSession != null) {
             try {
                 // 关闭预览
                 mCameraCaptureSession.stopRepeating();
             } catch (CameraAccessException e) {
+                openCameraAndStartPreview();
                 e.printStackTrace();
             }
         }
@@ -256,12 +249,8 @@ public class CameraFeatureManager implements ImageReader.OnImageAvailableListene
     /**
      * session开启预览
      */
-    private void sessionPreview() {
-        // 这边相机没有打开时不得操作session否则会崩溃
-        if (!mCameraIsOpen) return;
-        if (mCameraCaptureSession == null) return;
-        if (mCameraDevice == null) return;
-        if (mSurface == null) return;
+    private void sessionPreview() throws android.hardware.camera2.CameraAccessException {
+        if (!mSessionConfigured) openCameraAndStartPreview();
         try {
             // 预览请求Builder
             CaptureRequest.Builder requestBuilder = mCameraDevice.createCaptureRequest(CameraDevice.TEMPLATE_PREVIEW);
@@ -313,8 +302,9 @@ public class CameraFeatureManager implements ImageReader.OnImageAvailableListene
             // 建立请求
             mPreviewRequest = requestBuilder.build();
             // 开始显示相机预览
-            mCameraCaptureSession.setRepeatingRequest(mPreviewRequest, null, null);
+            mCameraCaptureSession.setRepeatingRequest(mPreviewRequest, null, mMainHandler);
         } catch (CameraAccessException e) {
+            openCameraAndStartPreview();
             e.printStackTrace();
         }
     }
@@ -360,7 +350,7 @@ public class CameraFeatureManager implements ImageReader.OnImageAvailableListene
      */
     @Override
     public void stopCameraAndPreview() {
-        mCameraIsOpen = false;
+        mSessionConfigured = false;
         // 关掉相机设备
         if (mCameraDevice != null) {
             mCameraDevice.close();
@@ -416,6 +406,7 @@ public class CameraFeatureManager implements ImageReader.OnImageAvailableListene
             // 打开摄像头
             mCameraManager.openCamera(mCameraID, mCameraStateCallback, mMainHandler);
         } catch (CameraAccessException e) {
+            openCameraAndStartPreview();
             e.printStackTrace();
         }
     }
@@ -425,10 +416,10 @@ public class CameraFeatureManager implements ImageReader.OnImageAvailableListene
      */
     @Override
     public void takePhoto() {
-        if (mCameraDevice == null) return;
-        if (mImageReader == null) return;
-        if (mCameraCaptureSession == null) return;
-        if (mPreviewRequest == null) return;
+        if (!mSessionConfigured) {
+            openCameraAndStartPreview();
+            return;
+        }
         try {
             // 创建拍照需要的CaptureRequest.Builder
             final CaptureRequest.Builder captureRequestBuilder = mCameraDevice.createCaptureRequest(CameraDevice.TEMPLATE_STILL_CAPTURE);
@@ -466,13 +457,15 @@ public class CameraFeatureManager implements ImageReader.OnImageAvailableListene
                     super.onCaptureCompleted(session, request, result);
                     try {
                         // 拍照完了重新开启预览
-                        mCameraCaptureSession.setRepeatingRequest(mPreviewRequest, null, null);
+                        mCameraCaptureSession.setRepeatingRequest(mPreviewRequest, null, mMainHandler);
                     } catch (CameraAccessException e) {
+                        openCameraAndStartPreview();
                         e.printStackTrace();
                     }
                 }
-            }, mChildHandler);
+            }, mMainHandler);
         } catch (CameraAccessException e) {
+            openCameraAndStartPreview();
             e.printStackTrace();
         }
     }
@@ -612,9 +605,8 @@ public class CameraFeatureManager implements ImageReader.OnImageAvailableListene
                 if (mImageReader == null) return;
                 // 创建预览Session
                 camera.createCaptureSession(Arrays.asList(mSurface, mImageReader.getSurface()), new PreviewSessionStateCallback(), mMainHandler);
-                // 标记相机已打开
-                mCameraIsOpen = true;
             } catch (CameraAccessException e) {
+                openCameraAndStartPreview();
                 e.printStackTrace();
             }
         }
@@ -638,8 +630,14 @@ public class CameraFeatureManager implements ImageReader.OnImageAvailableListene
         @Override
         public void onConfigured(@NonNull CameraCaptureSession cameraCaptureSession) {
             mCameraCaptureSession = cameraCaptureSession;
+            mSessionConfigured = true;
             // 开启预览
-            sessionPreview();
+            try {
+                sessionPreview();
+            } catch (CameraAccessException e) {
+                openCameraAndStartPreview();
+                e.printStackTrace();
+            }
         }
 
         @Override

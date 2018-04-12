@@ -88,6 +88,9 @@ public class CustomTextureView extends TextureView {
                 if (!mIsDoublePoint) {
                     break;
                 }
+                if (event.getPointerCount() < 2) {
+                    break;
+                }
                 // 计算两点间距
                 float disX = Math.abs(event.getX(0) - event.getX(1));
                 float disY = Math.abs(event.getY(0) - event.getY(1));

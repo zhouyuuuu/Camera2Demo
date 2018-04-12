@@ -7,7 +7,7 @@ import android.view.TextureView;
 
 import com.example.administrator.cameraproject.module.camera.model.CameraFeatureManager;
 import com.example.administrator.cameraproject.module.camera.model.ICameraFeatureManager;
-import com.example.administrator.cameraproject.module.camera.view.ICameraFeatureView;
+import com.example.administrator.cameraproject.module.camera.view.ICameraView;
 
 import java.lang.ref.WeakReference;
 
@@ -20,11 +20,11 @@ import java.lang.ref.WeakReference;
 public class CameraFeaturePresenter implements ICameraFeaturePresenter {
 
     private ICameraFeatureManager mCameraFeatureManager;
-    private WeakReference<ICameraFeatureView> mCameraFeatureViewWeakReference;
+    private WeakReference<ICameraView> mCameraFeatureViewWeakReference;
 
-    public CameraFeaturePresenter(ICameraFeatureView iCameraFeatureView) {
+    public CameraFeaturePresenter(ICameraView iCameraView) {
         this.mCameraFeatureManager = new CameraFeatureManager(this);
-        mCameraFeatureViewWeakReference = new WeakReference<>(iCameraFeatureView);
+        mCameraFeatureViewWeakReference = new WeakReference<>(iCameraView);
     }
 
     /**
@@ -79,9 +79,9 @@ public class CameraFeaturePresenter implements ICameraFeaturePresenter {
      */
     @Override
     public void onPhotoToken(String fileName) {
-        ICameraFeatureView iCameraFeatureView = mCameraFeatureViewWeakReference.get();
-        if (iCameraFeatureView == null) return;
-        iCameraFeatureView.onPhotoToken(fileName);
+        ICameraView iCameraView = mCameraFeatureViewWeakReference.get();
+        if (iCameraView == null) return;
+        iCameraView.onPhotoToken(fileName);
     }
 
     /**
