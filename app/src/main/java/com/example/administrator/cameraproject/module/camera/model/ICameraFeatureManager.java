@@ -55,4 +55,12 @@ public interface ICameraFeatureManager {
      * @param flashMode 模式
      */
     void setFlashMode(int flashMode);
+
+    /**
+     * 设置焦点
+     *
+     * @param x x
+     * @param y x
+     */
+    void setFocusPoint(int x, int y);
 }

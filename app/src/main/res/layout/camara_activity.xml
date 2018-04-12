@@ -5,7 +5,7 @@
     android:layout_height="match_parent"
     tools:context="com.example.administrator.cameraproject.module.camera.activity.CameraActivity">
 
-    <TextureView
+    <com.example.administrator.cameraproject.module.camera.widget.CustomTextureView
         android:id="@+id/textureview_camera"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"

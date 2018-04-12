@@ -39,9 +39,13 @@ public class CameraConfig {
     // 前置摄像头照片修正角度
     public static final int CAMERA_REAR_PHOTO_REVISE_DEGREE = 90;
     // 照片比例16比9
-    public static final float CAMERA_PHOTI_RATIO_16_9 = 16F/9;
+    public static final float CAMERA_PHOTO_RATIO_16_9 = 16F / 9;
     // 照片比例4比3
-    public static final float CAMERA_PHOTI_RATIO_4_3 = 4F/3;
+    public static final float CAMERA_PHOTO_RATIO_4_3 = 4F / 3;
     // 照片比例1比1
-    public static final float CAMERA_PHOTI_RATIO_1_1 = 1F;
+    public static final float CAMERA_PHOTO_RATIO_1_1 = 1F;
+    // 焦点占width比
+    public static final float FOCUS_WIDTH_RATIO_DEFAULT = 0.5f;
+    // 焦点占height比
+    public static final float FOCUS_HEIGHT_RATIO_DEFAULT = 0.5f;
 }

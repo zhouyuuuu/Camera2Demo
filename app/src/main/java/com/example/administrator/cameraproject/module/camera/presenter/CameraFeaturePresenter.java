@@ -111,4 +111,15 @@ public class CameraFeaturePresenter implements ICameraFeaturePresenter {
     public void setFlashMode(int flashMode) {
         mCameraFeatureManager.setFlashMode(flashMode);
     }
+
+    /**
+     * 设置焦点
+     *
+     * @param x x
+     * @param y x
+     */
+    @Override
+    public void setFocusPoint(int x, int y) {
+        mCameraFeatureManager.setFocusPoint(x, y);
+    }
 }

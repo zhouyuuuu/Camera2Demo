@@ -6,6 +6,8 @@ import android.os.Build;
 import android.os.Bundle;
 import android.support.annotation.RequiresApi;
 import android.support.v7.app.AppCompatActivity;
+import android.util.Log;
+import android.view.MotionEvent;
 import android.view.TextureView;
 import android.view.View;
 import android.widget.ImageView;
@@ -14,6 +16,7 @@ import com.example.administrator.cameraproject.R;
 import com.example.administrator.cameraproject.module.camera.config.CameraConfig;
 import com.example.administrator.cameraproject.module.camera.presenter.CameraFeaturePresenter;
 import com.example.administrator.cameraproject.module.camera.view.ICameraFeatureView;
+import com.example.administrator.cameraproject.module.camera.widget.CustomTextureView;
 
 @RequiresApi(api = Build.VERSION_CODES.LOLLIPOP)
 public class CameraActivity extends AppCompatActivity implements View.OnClickListener, TextureView.SurfaceTextureListener, ICameraFeatureView {
@@ -29,7 +32,7 @@ public class CameraActivity extends AppCompatActivity implements View.OnClickLis
     // 当前闪光灯模式
     private int mCurScalesPos = 0;
     // 预览显示View
-    private TextureView mTextureView;
+    private CustomTextureView mTextureView;
     // 拍照按钮
     private ImageView mIvTakePhoto;
     // presenter
@@ -58,19 +61,34 @@ public class CameraActivity extends AppCompatActivity implements View.OnClickLis
     }
 
     private void initData() {
+        // 16比9、4比3、1比1三种尺寸比例
+        scales = new float[]{CameraConfig.CAMERA_PHOTO_RATIO_16_9, CameraConfig.CAMERA_PHOTO_RATIO_4_3, CameraConfig.CAMERA_PHOTO_RATIO_1_1};
+        // 关闭、打开、常亮三种闪光模式
+        modes = new int[]{CameraConfig.FLASH_OFF, CameraConfig.FLASH_ON, CameraConfig.FLASH_ALWAYS};
+        // 三种图标对应关闭、打开、常亮
+        flashIconRes = new int[]{R.mipmap.ic_flash_off, R.mipmap.ic_flash_on, R.mipmap.ic_flash_torch};
+        mCameraFeaturePresenter = new CameraFeaturePresenter(this);
         mIvChangeCamera.setOnClickListener(this);
         mIvTakePhoto.setOnClickListener(this);
         mIvCameraScale.setOnClickListener(this);
         mIvFlashMode.setOnClickListener(this);
         mTextureView.setOnClickListener(this);
         mTextureView.setSurfaceTextureListener(this);
-        mCameraFeaturePresenter = new CameraFeaturePresenter(this);
-        // 16比9、4比3、1比1三种尺寸比例
-        scales = new float[]{CameraConfig.CAMERA_PHOTI_RATIO_16_9, CameraConfig.CAMERA_PHOTI_RATIO_4_3, CameraConfig.CAMERA_PHOTI_RATIO_1_1};
-        // 关闭、打开、常亮三种闪光模式
-        modes = new int[]{CameraConfig.FLASH_OFF, CameraConfig.FLASH_ON, CameraConfig.FLASH_ALWAYS};
-        // 三种图标对应关闭、打开、常亮
-        flashIconRes = new int[]{R.mipmap.ic_flash_off, R.mipmap.ic_flash_on, R.mipmap.ic_flash_torch};
+        mTextureView.setOnTouchListener(new View.OnTouchListener() {
+            @Override
+            public boolean onTouch(View v, MotionEvent event) {
+                switch (event.getAction()){
+                    case MotionEvent.ACTION_DOWN:
+                        v.performClick();
+                        break;
+                    case MotionEvent.ACTION_UP:
+                        Log.e("asd", "onTouch: " );
+                        mCameraFeaturePresenter.setFocusPoint((int)event.getX(),(int)event.getY());
+                        break;
+                }
+                return true;
+            }
+        });
     }
 
     @Override
@@ -152,4 +170,5 @@ public class CameraActivity extends AppCompatActivity implements View.OnClickLis
         super.onRestart();
         mCameraFeaturePresenter.onRestart();
     }
+
 }

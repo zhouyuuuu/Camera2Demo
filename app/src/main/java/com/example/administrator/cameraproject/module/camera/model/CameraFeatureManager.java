@@ -8,6 +8,7 @@ import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.ImageFormat;
 import android.graphics.Matrix;
+import android.graphics.Rect;
 import android.graphics.SurfaceTexture;
 import android.hardware.camera2.CameraAccessException;
 import android.hardware.camera2.CameraCaptureSession;
@@ -26,6 +27,7 @@ import android.os.Looper;
 import android.support.annotation.NonNull;
 import android.support.annotation.RequiresApi;
 import android.support.v4.app.ActivityCompat;
+import android.util.Log;
 import android.util.Size;
 import android.view.Surface;
 import android.view.TextureView;
@@ -39,6 +41,8 @@ import com.example.administrator.cameraproject.module.camera.util.StoreUtil;
 import java.lang.ref.WeakReference;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
+
+import static android.content.ContentValues.TAG;
 
 /**
  * 相机功能管理者，Model，管理闪光灯、比例、镜头、预览、拍照
@@ -83,7 +87,13 @@ public class CameraFeatureManager implements ImageReader.OnImageAvailableListene
     // 默认闪光模式为关闭
     private int mFlashMode = CameraConfig.FLASH_OFF;
     // 默认照片比例为16比9
-    private float mCameraRatio = CameraConfig.CAMERA_PHOTI_RATIO_16_9;
+    private float mCameraRatio = CameraConfig.CAMERA_PHOTO_RATIO_16_9;
+    // 焦点占width比
+    private float mFocusWidthRatio = CameraConfig.FOCUS_WIDTH_RATIO_DEFAULT;
+    // 焦点占height比
+    private float mFocusHeightRatio = CameraConfig.FOCUS_HEIGHT_RATIO_DEFAULT;
+    // 获取的图像对应的rect
+    private Rect mRect;
 
     public CameraFeatureManager(ICameraFeaturePresenter iCameraFeaturePresenter) {
         this.mMainHandler = new Handler(Looper.getMainLooper());
@@ -120,6 +130,20 @@ public class CameraFeatureManager implements ImageReader.OnImageAvailableListene
             }
         }
         return retSize;
+    }
+
+    /**
+     * 设置焦点在图像中的x比和y比
+     *
+     * @param x x
+     * @param y x
+     */
+    public void setFocusPoint(int x, int y) {
+        TextureView textureView = mTextureViewWeakReference.get();
+        mFocusWidthRatio = 1f * x / textureView.getWidth();
+        mFocusHeightRatio = 1f * y / textureView.getHeight();
+        sessionStopPreview();
+        sessionPreview();
     }
 
     /**
@@ -165,6 +189,28 @@ public class CameraFeatureManager implements ImageReader.OnImageAvailableListene
             requestBuilder.addTarget(mSurface);
             // 设置自动对焦模式
             requestBuilder.set(CaptureRequest.CONTROL_AF_MODE, CaptureRequest.CONTROL_AF_MODE_CONTINUOUS_PICTURE);
+            // 对焦区域
+            android.hardware.camera2.params.MeteringRectangle[] meteringRectangles = new android.hardware.camera2.params.MeteringRectangle[1];
+            // 焦点区域左边，rect是横屏的，rect的right对应了竖屏的activity中view的height，因此是right乘以高度比
+            int x = (int) (mRect.right * mFocusHeightRatio) - 5;
+            // 这边防止-5后小于0
+            if (x < 0) x = 0;
+            // 焦点区域上边，这边（1-宽度比）是因为竖屏模式下，view的坐标原点在屏幕左上角，rect的坐标点在屏幕右上角
+            int y = (int) (mRect.bottom * (1f - mFocusWidthRatio)) - 5;
+            // 这边防止-5后小于0
+            if (y < 0) y = 0;
+            // 焦点区域宽度
+            int width = 10;
+            // 焦点区域高度
+            int height = 10;
+            Log.e(TAG, "sessionPreview: " + x + " " + y);
+            // 新建对焦区域对象
+            meteringRectangles[0] = new android.hardware.camera2.params.MeteringRectangle(x, y, width, height, 1);
+            // 设置对焦区域
+            requestBuilder.set(CaptureRequest.CONTROL_AF_REGIONS, meteringRectangles);
+            // 设置测光区域，测光区域与对焦区域要一致
+            requestBuilder.set(CaptureRequest.CONTROL_AE_REGIONS, meteringRectangles);
+            // 如果闪光模式为ALWAYS,则预览的时候打开闪光灯
             if (mFlashMode == CameraConfig.FLASH_ALWAYS) {
                 requestBuilder.set(CaptureRequest.CONTROL_AE_MODE, CaptureRequest.CONTROL_AE_MODE_ON);
                 requestBuilder.set(CaptureRequest.FLASH_MODE, CaptureRequest.FLASH_MODE_TORCH);
@@ -420,6 +466,8 @@ public class CameraFeatureManager implements ImageReader.OnImageAvailableListene
                 mCameraDevice = camera;
                 // 控制摄像头属性的对象
                 CameraCharacteristics characteristics = mCameraManager.getCameraCharacteristics(mCameraID);
+                // 拍摄图像的Rect，设置焦点区域时根据该Rect的长宽来设置
+                mRect = characteristics.get(CameraCharacteristics.SENSOR_INFO_ACTIVE_ARRAY_SIZE);
                 // 获取摄像头支持的配置属性
                 StreamConfigurationMap map = characteristics.get(CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP);
                 // 获取摄像头支持的最大尺寸
